@@ -26,15 +26,15 @@ assetfinder -subs-only $domain >> domains.txt
 
 #Running Findomain
 printf "[+] Running findomain\n"
-findomain -q -t evil.com >> domains.txt
+findomain -q -t $domain >> domains.txt
 
 #Running Subfinder
 printf "[+] Running subfinder\n"
-subfinder -d evil.com -silent >> domains.txt
+subfinder -d $domain -silent >> domains.txt
 
 #Running waybackurls + unfurl to find subdomains
 printf "[+] Running waybackurls + unfurl to find subdomains\n"
-waybackurls evil.com |  unfurl -u domains >> domains.txt
+waybackurls $domain |  unfurl -u domains >> domains.txt
 
 #Removing duplicate entries
 printf "[+] Removing Duplicates from domains.txt\n"

@@ -24,6 +24,18 @@ python3 /home/mu3ht4k/opt/Sublist3r/sublist3r.py -d $domain -o domains.txt > /de
 printf "[+] Running assetfinder\n"
 assetfinder -subs-only $domain >> domains.txt
 
+#Running Findomain
+printf "[+] Running findomain\n"
+findomain -q -t evil.com >> domains.txt
+
+#Running Subfinder
+printf "[+] Running subfinder\n"
+subfinder -d evil.com -silent >> domains.txt
+
+#Running waybackurls + unfurl to find subdomains
+printf "[+] Running waybackurls + unfurl to find subdomains\n"
+waybackurls evil.com |  unfurl -u domains >> domains.txt
+
 #Removing duplicate entries
 printf "[+] Removing Duplicates from domains.txt\n"
 sort -u domains.txt > final_domains.txt

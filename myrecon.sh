@@ -1,3 +1,5 @@
+#!/bin/bash
+
 usage() {
     echo -e "Usage: ./myrecon.sh -d domain.com" 1>&2;
     exit 1;
@@ -18,7 +20,7 @@ echo "> PLEASE WAIT WHILE WE AUTOMATE YOUR LITTLE PIECE OF SHIT..."
 
 #Sublist3r enumeration
 printf "[+] Running sublist3r\n"
-python3 /home/mu3ht4k/opt/Sublist3r/sublist3r.py -d $domain -o domains.txt > /dev/null
+python3 /home/h4ck3r/opt/Sublist3r/sublist3r.py -d $domain -o domains.txt > /dev/null
 
 #Assetfinder enumeration
 printf "[+] Running assetfinder\n"
@@ -47,4 +49,23 @@ printf "[+] Checking for alive domain\n"
 cat final_domains.txt | httpx -silent -mc 200 > alive.txt
 
 printf "[+] Saved alive domains in alive.txt\n"
-printf "DONEEEE!!!!!!\n"
+
+#Waybackurls
+printf "[+] Collecting URLs using waybackurls\n"
+cat alive.txt | waybackurls | sort -u > wayback.txt
+
+#GF
+printf "[+] Collecting parameters for SSRF, SQLI, IDOR, XSS, REDIRECT using GF\n\n"
+cat wayback.txt | gf idor | tee -a idor.txt
+
+cat wayback.txt | gf xss | tee -a xss.txt
+
+cat wayback.txt | gf redirect | tee -a redirect.txt
+
+cat wayback.txt | gf ssrf | tee -a ssrf.txt
+
+cat wayback.txt | gf sqli | tee -a sqli.txt
+
+wc -l *.txt
+
+printf "\nDONEEEE!!!!!!\n"

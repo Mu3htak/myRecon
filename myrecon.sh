@@ -16,7 +16,7 @@ while getopts ":d:" o; do
 done
 shift $((OPTIND - 1))
 
-echo "> PLEASE WAIT WHILE WE AUTOMATE YOUR LITTLE PIECE OF SHIT..."
+echo "> heehehehehe...."
 
 #Sublist3r enumeration
 printf "[+] Running sublist3r\n"

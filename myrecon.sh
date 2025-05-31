@@ -19,58 +19,75 @@ if [ -z "$domain" ]; then
     usage
 fi
 
+# Create recon folder for domain
+#mkdir -p recon/$domain && cd recon/$domain
+
 echo "[+] Starting Recon for $domain"
 
-# Subdomain Enumeration
-echo "[+] Running Sublist3r"
-sublist3r -d $domain -o domains.txt > /dev/null
+# 1. Subdomain Enumeration
+echo "[+] Running amass"
+amass enum -passive -d $domain -o amass.txt
 
 echo "[+] Running assetfinder"
-assetfinder -subs-only $domain >> domains.txt
+assetfinder -subs-only $domain >> assetfinder.txt
 
 echo "[+] Running findomain"
-findomain -q -t $domain >> domains.txt
+findomain -q -t $domain >> findomain.txt
 
 echo "[+] Running subfinder"
-subfinder -d $domain -silent >> domains.txt
+subfinder -d $domain -silent >> subfinder.txt
 
 echo "[+] Running waybackurls + unfurl"
-waybackurls $domain | unfurl -u domains >> domains.txt
+waybackurls $domain | unfurl -u domains >> wayback_unfurl.txt
 
-# Deduplicate and Check Alive
-sort -u domains.txt > unique_domains.txt
-httpx -l unique_domains.txt -silent -o alive.txt
+# 2. Combine and deduplicate all domains
+cat amass.txt assetfinder.txt findomain.txt subfinder.txt wayback_unfurl.txt | sort -u > domains.txt
 
-# JS File Analysis
-echo "[+] Extracting JavaScript Files"
-while read sub; do gau $sub 2>/dev/null; done < alive.txt | grep -E '\.js$' | tee js_files.txt
+echo "[+] Resolving DNS using dnsx"
+dnsx -silent -l domains.txt > resolved.txt
 
-# Subdomain Takeover Detection
-echo "[+] Checking for subdomain takeover"
-subzy run --targets unique_domains.txt --hide_fails --output takeover_results.txt
+# 3. Filter valid domains
+echo "[+] Checking alive domains"
+httpx -l resolved.txt -mc 200 -silent -o alive.txt
 
-# Nuclei Scanning
+# 4. Clean URLs using gau and uro
+echo "[+] Gathering URLs and cleaning..."
+cat alive.txt | gau 2>/dev/null | uro > clean_urls.txt
+
+# 5. JavaScript file extraction (optional)
+# echo "[+] Extracting JavaScript Files"
+# while read sub; do gau $sub 2>/dev/null; done < alive.txt | grep -E '\.js$' | uro > js_files.txt
+
+# 6. Nuclei Scans
 echo "[+] Running Nuclei Scans"
-nuclei -l alive.txt -t network/misconfig/ -silent -o nuclei_misconfig.txt
-nuclei -l alive.txt -t vulnerabilities/ -silent -o nuclei_vulnerabilities.txt
-
-# Parameter Discovery
-echo "[+] Extracting parameters (XSS, SSRF, IDOR, etc)"
-while read sub; do waybackurls $sub; done < alive.txt | tee wayback_all.txt \
-| gf xss >> gf_xss.txt \
-| gf ssrf >> gf_ssrf.txt \
-| gf idor >> gf_idor.txt \
-| gf lfi >> gf_lfi.txt \
-| gf sqli >> gf_sqli.txt
-
-# Combine all gf results
-cat gf_*.txt | sort -u > params.txt
-
-# Reflected XSS Detection using kxss
+#nuclei -l alive.txt -t misconfiguration/ -o misconfig.txt
+#nuclei -l alive.txt -t vulnerabilities/ -silent -o nuclei_vulnerabilities.txt
+nuclei -l alive.txt -t takeovers/ -o takeover_results.txt
+nuclei -l alive.txt -t exposed-panels/ -o panels.txt
+nuclei -l alive.txt -t default-logins/ -o logins.txt
+# 7. Reflected XSS Detection with kxss
 echo "[+] Scanning for reflected XSS using kxss"
-while read sub; do gau $sub 2>/dev/null; done < alive.txt | kxss | tee xss_results.txt
+while read sub; do
+  gau "$sub" 2>/dev/null
+done < alive.txt |
+grep -vE "\.(json|js|jpe?g|gif|css|tiff?|png|ttf|woff2?|ico|svg)(\?|$)" |
+uro |
+kxss > xss_results.txt
 
-# Finalizing
-echo "[+] Recon Completed for"  $domain ! "Results saved in corresponding output files." | notify -silent
+# 8. Parameter Discovery using Arjun
+echo "[+] Discovering hidden parameters using Arjun"
+cat clean_urls.txt | while read url; do
+  arjun -u "$url" -m GET -oT -q >> arjun_params.txt
+done
 
+# 9. Optional Subdomain Takeover Detection
+# echo "[+] Checking for subdomain takeover"
+# subzy run --targets domains.txt --hide_fails --output takeover_results.txt
+
+# 10. Completion
+echo "[+] Recon Completed for $domain! Results saved in recon/$domain"
+notify -silent -data "Recon completed for $domain"
+
+# Summary
+echo -e "\n[+] Summary:"
 wc -l *.txt
